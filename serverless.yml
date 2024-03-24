@@ -1,0 +1,47 @@
+service: chat-app-aws
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  stage: dev
+  region: us-east-1 # Choose your preferred AWS region
+
+functions:
+  connect:
+    handler: connections.connect
+    events:
+      - websocket:
+          route: $connect
+  disconnect:
+    handler: connections.disconnect
+    events:
+      - websocket:
+          route: $disconnect
+  sendMessage:
+    handler: messages.sendMessage
+    events:
+      - websocket:
+          route: sendMessage
+
+resources:
+  Resources:
+    ChatTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        TableName: ChatMessages
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: connectionId
+            AttributeType: S
+          - AttributeName: timestamp
+            AttributeType: N
+        KeySchema:
+          - AttributeName: connectionId
+            KeyType: HASH
+          - AttributeName: timestamp
+            KeyType: RANGE
+
+plugins:
+  - serverless-offline
+  - serverless-dynamodb-local
