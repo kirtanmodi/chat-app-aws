@@ -97,6 +97,11 @@ exports.deleteAllCommonMessages = async (event) => {
     if (messages.Items.length === 0) {
       return {
         statusCode: 200,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "OPTIONS, DELETE",
+          "Access-Control-Allow-Credentials": true,
+        },
         body: "No messages to delete.",
       };
     }
@@ -127,11 +132,21 @@ exports.deleteAllCommonMessages = async (event) => {
     return {
       statusCode: 200,
       body: "All messages deleted.",
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "OPTIONS, DELETE",
+        "Access-Control-Allow-Credentials": true,
+      },
     };
   } catch (error) {
     console.error("Failed to delete messages:", error);
     return {
       statusCode: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "OPTIONS, DELETE",
+        "Access-Control-Allow-Credentials": true,
+      },
       body: "Failed to delete messages: " + JSON.stringify(error),
     };
   }

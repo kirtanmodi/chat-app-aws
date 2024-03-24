@@ -48,6 +48,7 @@ functions:
       - http:
           method: delete
           path: /messages/common
+          cors: true
 
 resources:
   Resources:
