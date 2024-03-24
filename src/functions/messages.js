@@ -1,10 +1,8 @@
 const AWS = require("aws-sdk");
-console.log("AWS log example:", JSON.stringify(AWS, null, 2));
 const ddb = new AWS.DynamoDB.DocumentClient({
   apiVersion: "2012-08-10",
   region: process.env.AWS_REGION,
 });
-console.log("ddb log example:", JSON.stringify(ddb, null, 2));
 const { ApiGatewayManagementApi } = require("aws-sdk");
 
 exports.sendMessage = async (event) => {
@@ -88,6 +86,53 @@ exports.sendMessage = async (event) => {
     return {
       statusCode: 500,
       body: "Failed to send messages: " + JSON.stringify(err),
+    };
+  }
+};
+
+exports.deleteAllCommonMessages = async (event) => {
+  try {
+    const messages = await ddb.scan({ TableName: "ChatMessages" }).promise();
+
+    if (messages.Items.length === 0) {
+      return {
+        statusCode: 200,
+        body: "No messages to delete.",
+      };
+    }
+
+    const deleteRequests = messages.Items.map((message) => ({
+      DeleteRequest: {
+        Key: {
+          connectionId: message.connectionId,
+          timestamp: message.timestamp,
+        },
+      },
+    }));
+
+    const MAX_BATCH_SIZE = 25;
+    for (let i = 0; i < deleteRequests.length; i += MAX_BATCH_SIZE) {
+      const batch = deleteRequests.slice(i, i + MAX_BATCH_SIZE);
+      await ddb
+        .batchWrite({
+          RequestItems: {
+            ChatMessages: batch,
+          },
+        })
+        .promise();
+    }
+
+    console.log("All messages deleted successfully.");
+
+    return {
+      statusCode: 200,
+      body: "All messages deleted.",
+    };
+  } catch (error) {
+    console.error("Failed to delete messages:", error);
+    return {
+      statusCode: 500,
+      body: "Failed to delete messages: " + JSON.stringify(error),
     };
   }
 };
