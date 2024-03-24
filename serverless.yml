@@ -3,29 +3,58 @@ frameworkVersion: '3'
 
 provider:
   name: aws
-  runtime: nodejs18.x
+  runtime: nodejs16.x
   stage: dev
-  region: us-east-1 # Choose your preferred AWS region
+  region: us-east-1
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:PutItem
+        - dynamodb:GetItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+        - dynamodb:Scan
+        - dynamodb:Query
+      Resource: 
+        - "arn:aws:dynamodb:${self:provider.region}:*:table/ChatConnections"
+        - "arn:aws:dynamodb:${self:provider.region}:*:table/ChatMessages"
+    - Effect: Allow
+      Action:
+        - execute-api:ManageConnections
+      Resource: 
+        - "arn:aws:execute-api:${self:provider.region}:*:*/@connections/*"
+
 
 functions:
   connect:
-    handler: connections.connect
+    handler: ./src/functions/connections.connect
     events:
       - websocket:
           route: $connect
   disconnect:
-    handler: connections.disconnect
+    handler: ./src/functions/connections.disconnect
     events:
       - websocket:
           route: $disconnect
   sendMessage:
-    handler: messages.sendMessage
+    handler: ./src/functions/messages.sendMessage
     events:
       - websocket:
           route: sendMessage
 
 resources:
   Resources:
+    ChatConnections:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        TableName: ChatConnections
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: connectionId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: connectionId
+            KeyType: HASH
     ChatTable:
       Type: 'AWS::DynamoDB::Table'
       Properties:
@@ -45,3 +74,13 @@ resources:
 plugins:
   - serverless-offline
   - serverless-dynamodb-local
+
+custom:
+  dynamodb:
+    stages:
+      - dev
+    start:
+      migrate: true
+      seed: true
+      inMemory: true
+      port: 8000
