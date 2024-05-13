@@ -1,11 +1,16 @@
 service: chat-app-aws
 frameworkVersion: '3'
-
+useDotenv: true
 provider:
   name: aws
   runtime: nodejs16.x
-  stage: dev
+  stage: ${opt:stage, 'dev'}
   region: us-east-1
+  environment:
+    USER_POOL_ID:
+      Ref: UserPool
+    USER_POOL_CLIENT_ID:
+      Ref: UserPoolClient
   iamRoleStatements:
     - Effect: Allow
       Action:
@@ -24,6 +29,14 @@ provider:
         - execute-api:ManageConnections
       Resource: 
         - "arn:aws:execute-api:${self:provider.region}:*:*/@connections/*"
+    - Effect: Allow
+      Action:
+        - cognito-idp:AdminCreateUser
+        - cognito-idp:AdminSetUserPassword
+        - cognito-idp:AdminInitiateAuth
+        - cognito-idp:AdminAddUserToGroup
+        - cognito-idp:AdminListGroupsForUser
+      Resource: !GetAtt UserPool.Arn
 
 
 functions:
@@ -49,9 +62,80 @@ functions:
           method: delete
           path: /messages/common
           cors: true
+  register:
+    handler: ./src/functions/auth.register
+    events:
+      - http:
+          path: /register
+          method: post
+          cors: true
+
+  confirmRegistration:
+    handler: ./src/functions/auth.confirmRegistration
+    events:
+      - http:
+          path: /confirmRegistration
+          method: post
+          cors: true
+
+  login:
+    handler: ./src/functions/auth.login
+    events:
+      - http:
+          path: /login
+          method: post
+          cors: true 
+
+  changePassword:
+    handler: ./src/functions/auth.changePassword
+    events:
+      - http:
+          path: /changePassword
+          method: post
+          cors: true 
 
 resources:
   Resources:
+    UserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: ${self:service}-user-pool-${sls:stage}
+        UsernameAttributes:
+          - email
+        AutoVerifiedAttributes:
+          - email
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 6
+        Schema:
+          - AttributeDataType: String
+            Name: email
+            Required: true
+          - AttributeDataType: String
+            Name: name
+            Required: true
+
+    UserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: ${self:service}-user-pool-client-${sls:stage}
+        GenerateSecret: false
+        UserPoolId:
+          Ref: UserPool
+        ExplicitAuthFlows:
+          - "ADMIN_NO_SRP_AUTH"
+
+    CognitoAuthorizer:
+      Type: AWS::ApiGateway::Authorizer
+      Properties:
+        Name: CognitoAuthorizer
+        IdentitySource: method.request.header.Authorization
+        RestApiId:
+          Ref: ApiGatewayRestApi
+        Type: COGNITO_USER_POOLS
+        ProviderARNs:
+          - !GetAtt UserPool.Arn
+
     ChatConnections:
       Type: 'AWS::DynamoDB::Table'
       Properties:

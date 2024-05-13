@@ -10,10 +10,7 @@ exports.sendMessage = async (event) => {
   const postData = JSON.parse(event.body).data;
   console.log("postData log example:", JSON.stringify(postData, null, 2));
   const connectionId = event.requestContext.connectionId;
-  console.log(
-    "connectionId log example:",
-    JSON.stringify(connectionId, null, 2)
-  );
+  console.log("connectionId log example:", JSON.stringify(connectionId, null, 2));
   const timestamp = new Date().getTime();
   console.log("timestamp log example:", JSON.stringify(timestamp, null, 2));
 
@@ -21,7 +18,7 @@ exports.sendMessage = async (event) => {
     await ddb
       .put({
         TableName: "ChatMessages",
-        Item: { connectionId, timestamp, message: postData },
+        Item: { connectionId, timestamp, message: postData, senderName }, // Include senderName
       })
       .promise();
   } catch (err) {
@@ -32,13 +29,11 @@ exports.sendMessage = async (event) => {
     };
   }
 
-  let connectionData;
+  let connectionData, senderName;
   try {
     connectionData = await ddb.scan({ TableName: "ChatConnections" }).promise();
-    console.log(
-      "connectionData log example:",
-      JSON.stringify(connectionData, null, 2)
-    );
+    senderName = connectionData.Items.find((item) => item.connectionId === connectionId).name;
+    console.log("connectionData log example:", JSON.stringify(connectionData, null, 2));
   } catch (err) {
     console.log("err log example:", JSON.stringify(err, null, 2));
     return {
@@ -56,21 +51,14 @@ exports.sendMessage = async (event) => {
   console.log("apiGateway log example:", JSON.stringify(apiGateway, null, 2));
 
   const postCalls = connectionData.Items.map(async ({ connectionId }) => {
-    console.log(
-      "connectionId log example:",
-      JSON.stringify(connectionId, null, 2)
-    );
+    console.log("connectionId log example:", JSON.stringify(connectionId, null, 2));
     try {
-      await apiGateway
-        .postToConnection({ ConnectionId: connectionId, Data: postData })
-        .promise();
+      await apiGateway.postToConnection({ ConnectionId: connectionId, Data: postData }).promise();
     } catch (err) {
       console.log("err log example:", JSON.stringify(err, null, 2));
       if (err.statusCode === 410) {
         console.log(`Found stale connection, deleting ${connectionId}`);
-        await ddb
-          .delete({ TableName: "ChatConnections", Key: { connectionId } })
-          .promise();
+        await ddb.delete({ TableName: "ChatConnections", Key: { connectionId } }).promise();
       } else {
         console.error("Error posting to connection", err);
         throw err;

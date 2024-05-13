@@ -7,11 +7,13 @@ const ddb = new AWS.DynamoDB.DocumentClient({
 const { TableName } = { TableName: "ChatConnections" };
 
 exports.connect = async (event) => {
-  const connectionId = event.requestContext.connectionId;
+  const { connectionId } = event.requestContext;
+  const { name } = JSON.parse(event.body);
   const putParams = {
     TableName,
     Item: {
       connectionId: connectionId,
+      name: name,
     },
   };
 
